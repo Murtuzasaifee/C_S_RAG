@@ -1,10 +1,11 @@
 from app.services.llm_service import LLMService
 from app.services.web_search import WebSearchService
-from app.models import CRAGEvaluation, CRAGResult, RetrievedChunk
+from app.models import CRAGEvaluation, CRAGResult, RetrievedChunk, ChunkMetadata
 from app.config import get_settings
 from datetime import datetime
 from loguru import logger
 import json
+import tiktoken
 
 
 class CRAGService:
@@ -153,3 +154,75 @@ Provide a clear, accurate answer based on the context. If the context doesn't fu
         system_prompt = "You are a helpful assistant that answers questions based on provided context."
         
         return self.llm.generate(prompt, system_prompt, max_tokens=500)
+
+    def get_augmented_chunks(self, crag_result: CRAGResult) -> list[RetrievedChunk]:
+        """
+        Get chunks augmented with web search results for use in Self-Reflective RAG.
+        Converts web results to RetrievedChunk format.
+        """
+        chunks = []
+        tokenizer = tiktoken.get_encoding("cl100k_base")
+        now = datetime.utcnow()
+
+        if crag_result.evaluation.relevance_label == "irrelevant":
+            # Use only web search results
+            if crag_result.web_results:
+                for i, web_result in enumerate(crag_result.web_results):
+                    content = web_result['content']
+                    token_count = len(tokenizer.encode(content))
+                    char_count = len(content)
+                    preview = content[:100] + "..." if len(content) > 100 else content
+
+                    metadata = ChunkMetadata(
+                        chunk_id=f"web_search_{i}",
+                        source_file=web_result.get('url', 'web_search'),
+                        file_type="web_search",
+                        chunk_index=i,
+                        total_chunks=len(crag_result.web_results),
+                        chunk_method="web_search",
+                        token_count=token_count,
+                        char_count=char_count,
+                        content_preview=preview,
+                        keywords=[],
+                        created_at=now,
+                        processed_at=now
+                    )
+
+                    chunks.append(RetrievedChunk(
+                        content=content,
+                        score=0.9,  # High score for web results
+                        metadata=metadata
+                    ))
+        else:
+            # Use retrieved chunks + optionally web results (for ambiguous)
+            chunks.extend(crag_result.retrieved_chunks)
+
+            if crag_result.used_web_search and crag_result.web_results:
+                for i, web_result in enumerate(crag_result.web_results):
+                    content = web_result['content']
+                    token_count = len(tokenizer.encode(content))
+                    char_count = len(content)
+                    preview = content[:100] + "..." if len(content) > 100 else content
+
+                    metadata = ChunkMetadata(
+                        chunk_id=f"web_augment_{i}",
+                        source_file=web_result.get('url', 'web_search'),
+                        file_type="web_search_augmentation",
+                        chunk_index=i,
+                        total_chunks=len(crag_result.web_results),
+                        chunk_method="web_search_augmentation",
+                        token_count=token_count,
+                        char_count=char_count,
+                        content_preview=preview,
+                        keywords=[],
+                        created_at=now,
+                        processed_at=now
+                    )
+
+                    chunks.append(RetrievedChunk(
+                        content=content,
+                        score=0.85,  # Slightly lower than irrelevant case
+                        metadata=metadata
+                    ))
+
+        return chunks

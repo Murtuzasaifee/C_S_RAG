@@ -81,11 +81,15 @@ Criteria:
         try:
             response = self.llm.generate_with_json(prompt, system_prompt)
             reflection_data = json.loads(response)
-            
+
+            # Convert sources_cited to strings (LLM may return integers)
+            sources_cited = reflection_data.get("sources_cited", [])
+            sources_cited_str = [str(s) for s in sources_cited] if sources_cited else []
+
             return ReflectionResult(
                 answer_grounded=reflection_data.get("answer_grounded", False),
                 hallucination_detected=reflection_data.get("hallucination_detected", True),
-                sources_cited=reflection_data.get("sources_cited", []),
+                sources_cited=sources_cited_str,
                 reflection_score=reflection_data.get("reflection_score", 0.5),
                 needs_regeneration=reflection_data.get("needs_regeneration", True),
                 reflection_reason=reflection_data.get("reflection_reason", "Unknown"),

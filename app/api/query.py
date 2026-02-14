@@ -92,20 +92,31 @@ async def query_documents(request: QueryRequest):
             retrieved_chunks = sr_result.retrieved_chunks
             
         elif request.mode == "both":
-            # Execute both CRAG and Self-Reflective
+            # Execute CRAG first (evaluates relevance, triggers web search if needed)
             crag_result = crag_service.execute_crag(request.query, retrieved_chunks)
-            
-            working_chunks = retrieved_chunks
-            
+
+            # Get augmented chunks (includes web search results if triggered)
+            working_chunks = crag_service.get_augmented_chunks(crag_result)
+
+            logger.info(f"Mode=both: Using {len(working_chunks)} chunks for Self-Reflective "
+                       f"({len([c for c in working_chunks if c.metadata.file_type == 'web_search'])} from web search)")
+
+            # CRAG-aware retrieval function: preserves web search if it was triggered
             def retrieval_fn(refined_query):
-                return retrieval_service.retrieve(refined_query, request.top_k)
-            
+                # Re-retrieve from vector store
+                new_chunks = retrieval_service.retrieve(refined_query, request.top_k)
+                # Re-run CRAG evaluation on new chunks
+                new_crag_result = crag_service.execute_crag(refined_query, new_chunks)
+                # Return augmented chunks (preserves web search if triggered again)
+                return crag_service.get_augmented_chunks(new_crag_result)
+
+            # Execute Self-Reflective RAG with CRAG-augmented context
             sr_result = self_reflective_service.execute_self_reflective(
                 request.query,
-                working_chunks,
+                working_chunks,  # Now includes web search results!
                 retrieval_fn
             )
-            
+
             answer = sr_result.final_answer
             crag_details = crag_result
             reflection_details = sr_result
