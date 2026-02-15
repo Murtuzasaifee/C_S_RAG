@@ -94,6 +94,7 @@ This system implements **true hybrid search** using Qdrant's dual vector system:
 | **📝 Sparse** | BM25 keyword search with IDF weighting | Exact terms, technical jargon |
 | **🏎️ ColBERT** | Multi-vector late interaction (BGE-M3) | Fine-grained contextual matching |
 | **⚡ RSF** | Reciprocal Score Fusion (Tri-Vector) | Best overall accuracy (Recommended) |
+| **📊 DBSF** | Distribution-Based Score Fusion | Robust score normalization and fusion |
 
 **Key Features:**
 - **Tri-Vector Indexing**: Dense (1536-dim), Sparse (BM25), and ColBERT (Multi-Vector)
@@ -242,6 +243,7 @@ curl -X POST "http://localhost:8000/query/" \
 - `"colbert"` - Multi-vector search only
 - `"hybrid"` - Qdrant's internal RRF (Dense + Sparse)
 - `"rsf"` - Tri-Vector Fusion (Dense + Sparse + ColBERT) - **Recommended**
+- `"dbsf"` - Distribution-Based Score Fusion (Dense + Sparse)
 
 ### 5️⃣ Compare All Modes
 
@@ -278,6 +280,7 @@ HYBRID_SEARCH_ENABLED=true        # Enable hybrid search
 SPARSE_VECTOR_ENABLED=true        # Enable sparse vectors (BM25)
 RRF_K=60                          # RRF fusion parameter
 RSF_ENABLED=true                  # Enable Reciprocal Score Fusion
+DBSF_ENABLED=true                 # Enable Distribution-Based Score Fusion
 COLBERT_ENABLED=true              # Enable ColBERT Multi-Vector
 
 # 📊 CRAG Settings

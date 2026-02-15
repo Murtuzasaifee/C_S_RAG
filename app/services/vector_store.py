@@ -188,6 +188,27 @@ class VectorStore:
             with_payload=True
         ).points
 
+    def search_dbsf(
+        self,
+        query_vector: list[float],
+        query_text: str,
+        top_k: int,
+        search_filter=None
+    ) -> list:
+        """Hybrid search with DBSF (Distribution-Based Score Fusion)"""
+        sparse_query = self.sparse_service.generate_sparse_vector(query_text)
+
+        return self.client.query_points(
+            collection_name=self.collection_name,
+            prefetch=[
+                Prefetch(query=sparse_query, using="sparse", limit=top_k * 3),
+                Prefetch(query=query_vector, using="dense", limit=top_k * 3)
+            ],
+            query=FusionQuery(fusion=Fusion.DBSF),
+            limit=top_k,
+            with_payload=True
+        ).points
+
     def search_rsf(
         self,
         query_vector: list[float],
@@ -324,6 +345,12 @@ class VectorStore:
                     results = self.search_rsf(query_vector, query_text, top_k, search_filter)
                 else:
                     results = self.search_hybrid(query_vector, query_text, top_k, search_filter)
+            elif mode == "dbsf":
+                if not self.settings.dbsf_enabled:
+                    raise ValueError("DBSF search is disabled")
+                if not query_text or not query_vector:
+                    raise ValueError("query_text and query_vector required for dbsf search")
+                results = self.search_dbsf(query_vector, query_text, top_k, search_filter)
             elif mode == "rsf":
                 if not query_text or not query_vector:
                     raise ValueError("query_text and query_vector required for rsf search")

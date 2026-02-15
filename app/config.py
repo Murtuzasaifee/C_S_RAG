@@ -43,6 +43,9 @@ class Settings(BaseSettings):
     rsf_weight_sparse: float = 0.5
     rsf_weight_colbert: float = 1.0
 
+    # DBSF Settings
+    dbsf_enabled: bool = True
+
     # HYDE Settings
     hyde_num_hypotheses: int = 3
     hyde_enabled_by_default: bool = False

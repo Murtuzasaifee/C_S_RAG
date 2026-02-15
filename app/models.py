@@ -8,9 +8,9 @@ from datetime import datetime
 class QueryRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=1000)
     mode: Literal["standard", "crag", "self_reflective", "both"] = "both"
-    search_mode: Literal["dense", "sparse", "colbert", "hybrid", "rsf"] = Field(
+    search_mode: Literal["dense", "sparse", "colbert", "hybrid", "rsf", "dbsf"] = Field(
         default="hybrid",
-        description="Search mode: dense (semantic), sparse (keyword), colbert (multi-vector), hybrid (RRF fusion), or rsf (Tri-Vector Fusion)"
+        description="Search mode: dense (semantic), sparse (keyword), colbert (multi-vector), hybrid (RRF fusion), rsf (Tri-Vector Fusion), or dbsf (Distribution-Based Score Fusion)"
     )
     top_k: int = Field(default=5, ge=1, le=20)
     enable_hyde: bool = Field(
@@ -104,7 +104,7 @@ class QueryResponse(BaseModel):
     query: str
     answer: str
     mode: str
-    search_mode: Literal["dense", "sparse", "colbert", "hybrid", "rsf"]
+    search_mode: Literal["dense", "sparse", "colbert", "hybrid", "rsf", "dbsf"]
     sources: list[RetrievedChunk]
     crag_details: Optional[CRAGResult] = None
     reflection_details: Optional[SelfReflectiveResult] = None
