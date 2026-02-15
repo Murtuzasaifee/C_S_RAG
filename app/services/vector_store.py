@@ -188,6 +188,93 @@ class VectorStore:
             with_payload=True
         ).points
 
+    def search_rsf(
+        self,
+        query_vector: list[float],
+        query_text: str,
+        top_k: int,
+        search_filter=None
+    ) -> list:
+        """
+        Reciprocal Score Fusion (RSF) of Dense, Sparse, and ColBERT results.
+        Uses Min-Max scaling to normalize scores and weighted summation.
+        """
+        multiplier = self.settings.rsf_prefetch_multiplier
+        prefetch_k = top_k * multiplier
+        
+        # 1. Fetch results from all enabled sources
+        results = {}
+        
+        # Dense
+        dense_hits = self.search_dense(query_vector, prefetch_k, search_filter)
+        if dense_hits:
+            results['dense'] = dense_hits
+        
+        # Sparse (BM25)
+        if self.settings.sparse_vector_enabled:
+            sparse_hits = self.search_sparse(query_text, prefetch_k, search_filter)
+            if sparse_hits:
+                results['sparse'] = sparse_hits
+            
+        # ColBERT (Multi-Vector)
+        # Only fetch if configured to be used in fusion (weight > 0)
+        if (self.settings.colbert_enabled and 
+            self.settings.colbert_multivector_enabled and 
+            self.settings.rsf_weight_colbert > 0):
+            colbert_hits = self.search_colbert(query_text, prefetch_k, search_filter)
+            if colbert_hits:
+                results['colbert'] = colbert_hits
+        
+        # 2. Normalize and Fuse Scores
+        fused_scores = {}
+        point_map = {}
+        
+        # Get weights
+        weights = {
+            'dense': self.settings.rsf_weight_dense,
+            'sparse': self.settings.rsf_weight_sparse,
+            'colbert': self.settings.rsf_weight_colbert
+        }
+
+        for source, hits in results.items():
+            if not hits:
+                continue
+                
+            # Extract scores
+            scores = [hit.score for hit in hits]
+            min_score = min(scores)
+            max_score = max(scores)
+            score_range = max_score - min_score
+            
+            weight = weights.get(source, 1.0)
+            
+            for hit in hits:
+                if hit.id not in point_map:
+                    point_map[hit.id] = hit
+                    fused_scores[hit.id] = 0.0
+                
+                # Normalize score to [0, 1]
+                if score_range > 0:
+                    normalized_score = (hit.score - min_score) / score_range
+                else:
+                    normalized_score = 0.5  # If all scores are same, assign mid-point
+                
+                # Weighted sum
+                fused_scores[hit.id] += normalized_score * weight
+
+        # 3. Sort by fused score
+        sorted_ids = sorted(fused_scores, key=fused_scores.get, reverse=True)[:top_k]
+        
+        # 4. Construct final result list
+        final_results = []
+        for pid in sorted_ids:
+            hit = point_map[pid]
+            # Update score to fused score for transparency
+            hit.score = fused_scores[pid]
+            final_results.append(hit)
+            
+        return final_results
+
     def search(
         self,
         query_vector: list[float] | None = None,
@@ -203,8 +290,8 @@ class VectorStore:
             query_vector: Dense embedding vector (optional if query_text provided and mode is sparse/colbert)
             top_k: Number of results to return
             filter_conditions: Optional filter conditions
-            mode: Search mode - "dense", "sparse", "colbert", or "hybrid" (default)
-            query_text: Original query text (required for sparse/colbert/hybrid modes)
+            mode: Search mode - "dense", "sparse", "colbert", "hybrid", or "rsf" (default)
+            query_text: Original query text (required for sparse/colbert/hybrid/rsf modes)
 
         Returns:
             List of search results with scores and metadata
@@ -231,9 +318,18 @@ class VectorStore:
             elif mode == "hybrid":
                 if not query_text or not query_vector:
                     raise ValueError("query_text and query_vector required for hybrid search")
-                results = self.search_hybrid(query_vector, query_text, top_k, search_filter)
+                
+                # Check if we should use RSF instead of Qdrant's RRF
+                if self.settings.rsf_enabled:
+                    results = self.search_rsf(query_vector, query_text, top_k, search_filter)
+                else:
+                    results = self.search_hybrid(query_vector, query_text, top_k, search_filter)
+            elif mode == "rsf":
+                if not query_text or not query_vector:
+                    raise ValueError("query_text and query_vector required for rsf search")
+                results = self.search_rsf(query_vector, query_text, top_k, search_filter)
             else:
-                raise ValueError(f"Invalid search mode: {mode}. Must be 'dense', 'sparse', 'colbert', or 'hybrid'")
+                raise ValueError(f"Invalid search mode: {mode}. Must be 'dense', 'sparse', 'colbert', 'hybrid', or 'rsf'")
 
             return [
                 {

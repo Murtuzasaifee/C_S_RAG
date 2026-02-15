@@ -24,7 +24,7 @@
 ║                                                              ║
 ║   📚 Upload Documents  →  🔍 Hybrid Search  →  🤖 LLM Gen    ║
 ║                                                              ║
-║   ✅ Hybrid Search: Dense + Sparse + RRF Fusion             ║
+║   ✅ Hybrid Search: Dense + Sparse + ColBERT + RSF Fusion   ║
 ║   ✅ CRAG: Adaptive Web Search Based on Relevance           ║
 ║   ✅ Self-Reflective: Iterative Answer Grounding            ║
 ║   ✅ Both: Combined for Maximum Quality                     ║
@@ -72,7 +72,7 @@
 <td width="50%">
 
 ### 🛠️ **Core Capabilities**
-- 🔍 **Hybrid Search**: Dense + Sparse + RRF
+- 🔍 **Hybrid Search**: Dense + Sparse + ColBERT + RSF
 - 📄 **Multi-format support** (PDF, MD, TXT, JSON)
 - 🧩 **HybridChunker** (Docling integration)
 - 🗄️ **Qdrant dual vector storage**
@@ -92,11 +92,12 @@ This system implements **true hybrid search** using Qdrant's dual vector system:
 |------|-------------|----------|
 | **🎯 Dense** | Semantic search using OpenAI embeddings | Conceptual queries, synonyms |
 | **📝 Sparse** | BM25 keyword search with IDF weighting | Exact terms, technical jargon |
-| **⚡ Hybrid** | RRF fusion of dense + sparse (default) | Best overall accuracy |
+| **🏎️ ColBERT** | Multi-vector late interaction (BGE-M3) | Fine-grained contextual matching |
+| **⚡ RSF** | Reciprocal Score Fusion (Tri-Vector) | Best overall accuracy (Recommended) |
 
 **Key Features:**
-- **Dual Vector Indexing**: Every document gets both dense (1536-dim) and sparse (BM25) vectors
-- **RRF Fusion**: Reciprocal Rank Fusion combines rankings from both search methods
+- **Tri-Vector Indexing**: Dense (1536-dim), Sparse (BM25), and ColBERT (Multi-Vector)
+- **RSF Fusion**: Advanced Reciprocal Score Fusion of all three vector types
 - **Automatic Tokenization**: 50+ stop words filtered, term frequency analysis
 - **Compatible**: Works with all RAG modes, HYDE, and reranking
 
@@ -238,7 +239,9 @@ curl -X POST "http://localhost:8000/query/" \
 **Search Mode Options:**
 - `"dense"` - Semantic search only
 - `"sparse"` - Keyword search only (BM25)
-- `"hybrid"` - RRF fusion (default, recommended)
+- `"colbert"` - Multi-vector search only
+- `"hybrid"` - Qdrant's internal RRF (Dense + Sparse)
+- `"rsf"` - Tri-Vector Fusion (Dense + Sparse + ColBERT) - **Recommended**
 
 ### 5️⃣ Compare All Modes
 
@@ -274,6 +277,8 @@ LLM_MODEL=gpt-4o-mini
 HYBRID_SEARCH_ENABLED=true        # Enable hybrid search
 SPARSE_VECTOR_ENABLED=true        # Enable sparse vectors (BM25)
 RRF_K=60                          # RRF fusion parameter
+RSF_ENABLED=true                  # Enable Reciprocal Score Fusion
+COLBERT_ENABLED=true              # Enable ColBERT Multi-Vector
 
 # 📊 CRAG Settings
 CRAG_RELEVANCE_THRESHOLD=0.7      # Relevant if score ≥ 0.7

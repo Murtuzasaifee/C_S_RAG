@@ -35,6 +35,13 @@ class Settings(BaseSettings):
     hybrid_search_enabled: bool = True
     sparse_vector_enabled: bool = True
     rrf_k: int = 60  # RRF fusion parameter
+    
+    # RSF Settings
+    rsf_enabled: bool = True
+    rsf_prefetch_multiplier: int = 3
+    rsf_weight_dense: float = 1.0
+    rsf_weight_sparse: float = 0.5
+    rsf_weight_colbert: float = 1.0
 
     # HYDE Settings
     hyde_num_hypotheses: int = 3
