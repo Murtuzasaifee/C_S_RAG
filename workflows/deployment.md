@@ -50,28 +50,50 @@ aws sts get-caller-identity   # confirms auth
 ## Phase 1 — Build & Push Image to ECR
 
 ```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ============================================================
+# Configuration
+# ============================================================
 AWS_REGION="us-east-1"
 AWS_ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
 ECR_REPO="crag-rag-app"
-ECR_IMAGE="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com/$ECR_REPO:latest"
+ECR_REGISTRY="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+ECR_IMAGE="$ECR_REGISTRY/$ECR_REPO:latest"
 
-# Create the ECR repository (one-time)
+# ============================================================
+# Create the ECR repository (idempotent — skips if it exists)
+# ============================================================
 aws ecr create-repository \
-    --repository-name $ECR_REPO \
-    --region $AWS_REGION \
-    --image-scanning-configuration scanOnPush=true
+    --repository-name "$ECR_REPO" \
+    --region "$AWS_REGION" \
+    --image-scanning-configuration scanOnPush=true \
+    2>/dev/null || echo "Repository '$ECR_REPO' already exists, skipping creation."
 
+# ============================================================
 # Authenticate Docker to ECR
-aws ecr get-login-password --region $AWS_REGION | \
-    docker login --username AWS --password-stdin \
-    $AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+# ============================================================
+aws ecr get-login-password --region "$AWS_REGION" | \
+    docker login --username AWS --password-stdin "$ECR_REGISTRY"
 
-# Build for linux/amd64 (required on Apple Silicon M1/M2/M3)
-docker build --platform linux/amd64 -t $ECR_REPO:latest .
+# ============================================================
+# Build for linux/amd64 — required on Apple Silicon (M1/M2/M3)
+# --provenance=false prevents ECR from storing a separate
+# attestation manifest (avoids the "3 images" issue)
+# ============================================================
+docker build \
+    --platform linux/amd64 \
+    --provenance=false \
+    -t "$ECR_REPO:latest" .
 
+# ============================================================
 # Tag and push
-docker tag $ECR_REPO:latest $ECR_IMAGE
-docker push $ECR_IMAGE
+# ============================================================
+docker tag "$ECR_REPO:latest" "$ECR_IMAGE"
+docker push "$ECR_IMAGE"
+
+echo "✓ Successfully pushed $ECR_IMAGE"
 ```
 
 > **Build time note:** The first build downloads system packages and the
