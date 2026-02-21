@@ -167,12 +167,12 @@ This creates `.elasticbeanstalk/config.yml` (already gitignored).
 
 ```bash
 # Single-instance mode (no load balancer — simplest, ~$62/mo)
-eb create crag-rag-prod \
+eb create crag-rag-app \
     --instance-type t3.large \
     --single
 
 # OR with load balancer + auto-scaling (production-grade, ~$78/mo+)
-eb create crag-rag-prod \
+eb create crag-rag-app \
     --instance-type t3.large
 ```
 
@@ -317,7 +317,7 @@ All prices are for `us-east-1`, on-demand, single-instance mode.
 
 ```bash
 # Suspend — terminate the EC2 instance (stops billing; environment config preserved)
-eb terminate crag-rag-prod
+eb terminate crag-rag-app
 
 # Nuke everything — delete the EB application entirely
 eb terminate --all

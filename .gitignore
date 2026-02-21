@@ -67,7 +67,11 @@ notebooks/*
 notebooks/langchain/*
 
 !workflows/*
+!Dockerrun.aws.json
 archived/*
 workflows/README.md
 .claude/*
 tests/*
+
+
+.elasticbeanstalk/*
